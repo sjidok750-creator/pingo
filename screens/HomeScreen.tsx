@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { ReminderCard, Reminder } from '../components/ReminderCard';
+import { RingtonePickerScreen } from './RingtonePickerScreen';
 import { Colors, Fonts, Radius } from '../constants/tokens';
 
 const DUMMY_REMINDERS: Reminder[] = [
@@ -71,26 +70,9 @@ function StatCard({
   );
 }
 
-function NavTab({
-  label,
-  active,
-  onPress,
-  icon,
-}: {
-  label: string;
-  active?: boolean;
-  onPress?: () => void;
-  icon: React.ReactNode;
-}) {
-  return (
-    <TouchableOpacity style={navStyles.tab} onPress={onPress} activeOpacity={0.7}>
-      {icon}
-      <Text style={[navStyles.tabLabel, active && navStyles.tabLabelActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 export function HomeScreen() {
+  const [ringtoneOpen, setRingtoneOpen] = useState(false);
+
   return (
     <View style={styles.root}>
       <View style={styles.ambientGlow} pointerEvents="none" />
@@ -109,7 +91,11 @@ export function HomeScreen() {
               </Text>
               <Text style={styles.subtitle}>잊지 않을게요</Text>
             </View>
-            <TouchableOpacity style={styles.bellButton} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.bellButton}
+              activeOpacity={0.7}
+              onPress={() => setRingtoneOpen(true)}
+            >
               <Text style={{ fontSize: 18, color: Colors.text }}>🔔</Text>
             </TouchableOpacity>
           </View>
@@ -151,39 +137,11 @@ export function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Bottom nav */}
-      <View style={styles.navWrap} pointerEvents="box-none">
-        {Platform.OS === 'ios' ? (
-          <BlurView intensity={60} tint="dark" style={styles.navBar}>
-            <NavTabRow />
-          </BlurView>
-        ) : (
-          <View style={[styles.navBar, styles.navBarAndroid]}>
-            <NavTabRow />
-          </View>
-        )}
-      </View>
+      <RingtonePickerScreen
+        visible={ringtoneOpen}
+        onClose={() => setRingtoneOpen(false)}
+      />
     </View>
-  );
-}
-
-function NavTabRow() {
-  return (
-    <>
-      <NavTab
-        label="홈"
-        active
-        icon={<Text style={{ fontSize: 20, color: Colors.accent }}>⌂</Text>}
-      />
-      <NavTab
-        label="추가"
-        icon={<Text style={{ fontSize: 20, color: Colors.textSec }}>+</Text>}
-      />
-      <NavTab
-        label="설정"
-        icon={<Text style={{ fontSize: 20, color: Colors.textSec }}>⚙</Text>}
-      />
-    </>
   );
 }
 
@@ -209,7 +167,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 8,
-    paddingBottom: 200,
+    paddingBottom: 120,
   },
   header: {
     flexDirection: 'row',
@@ -309,7 +267,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 110,
+    bottom: 32,
     alignItems: 'center',
     zIndex: 30,
   },
@@ -324,51 +282,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 24,
     elevation: 12,
-  },
-  navWrap: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 24,
-    zIndex: 20,
-  },
-  navBar: {
-    height: 68,
-    borderRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  navBarAndroid: {
-    backgroundColor: 'rgba(22,22,30,0.92)',
-  },
-});
-
-const navStyles = StyleSheet.create({
-  tab: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  tabLabel: {
-    fontFamily: Fonts.text,
-    fontSize: 10.5,
-    fontWeight: '500',
-    color: Colors.textSec,
-    letterSpacing: 0.2,
-  },
-  tabLabelActive: {
-    fontWeight: '600',
-    color: Colors.accent,
-  },
-  bellWrap: {
-    width: 22,
-    height: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
