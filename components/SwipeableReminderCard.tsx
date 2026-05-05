@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   PanResponder,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -77,7 +78,7 @@ export function SwipeableReminderCard({
   ).current;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, Platform.OS === 'web' && (webTouch as any)]}>
       {/* Action layer (revealed when swiped) */}
       <View style={styles.actions} pointerEvents={isOpen ? 'auto' : 'none'}>
         <TouchableOpacity
@@ -111,6 +112,10 @@ export function SwipeableReminderCard({
     </View>
   );
 }
+
+// Web-only: tell the browser this region scrolls only vertically, so a
+// horizontal drag is captured by our PanResponder instead of panning the page.
+const webTouch = { touchAction: 'pan-y' };
 
 const styles = StyleSheet.create({
   wrap: {

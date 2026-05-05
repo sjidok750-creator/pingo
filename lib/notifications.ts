@@ -49,29 +49,61 @@ export async function ensurePermissionAsync(): Promise<boolean> {
   }
 }
 
+// A single, long-lived AudioContext that we create from a user gesture so
+// that subsequent setTimeout-driven playback isn't blocked by browser
+// autoplay policies (Chrome/Safari mobile).
+let sharedAudioCtx: any = null;
+
+export function primeAudio(): void {
+  if (typeof window === 'undefined') return;
+  const w = window as any;
+  const AudioCtx = w.AudioContext || w.webkitAudioContext;
+  if (!AudioCtx) return;
+  try {
+    if (!sharedAudioCtx) sharedAudioCtx = new AudioCtx();
+    if (sharedAudioCtx.state === 'suspended' && typeof sharedAudioCtx.resume === 'function') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    // Play an inaudible blip to fully unlock on iOS Safari.
+    const osc = sharedAudioCtx.createOscillator();
+    const gain = sharedAudioCtx.createGain();
+    gain.gain.value = 0;
+    osc.connect(gain).connect(sharedAudioCtx.destination);
+    osc.start(0);
+    osc.stop(sharedAudioCtx.currentTime + 0.01);
+  } catch {
+    // ignore
+  }
+}
+
 function playWebRingtone() {
   if (typeof window === 'undefined') return;
   const w = window as any;
   const AudioCtx = w.AudioContext || w.webkitAudioContext;
   if (!AudioCtx) return;
   try {
-    const ctx = new AudioCtx();
+    const ctx = sharedAudioCtx || (sharedAudioCtx = new AudioCtx());
+    if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+      ctx.resume().catch(() => {});
+    }
     const now = ctx.currentTime;
-    const pattern = [880, 1046, 880];
-    pattern.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      const t = now + i * 0.22;
-      gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.22);
-    });
-    setTimeout(() => ctx.close().catch(() => {}), pattern.length * 250 + 100);
+    // Repeat the pattern 3 times so it feels like a real alarm
+    const tones = [880, 1046, 880];
+    for (let rep = 0; rep < 3; rep++) {
+      tones.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const t = now + rep * 0.9 + i * 0.22;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.22);
+      });
+    }
   } catch {
     // ignore
   }

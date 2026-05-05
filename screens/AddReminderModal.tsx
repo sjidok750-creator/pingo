@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { Colors, Fonts, Radius } from '../constants/tokens';
+import { primeAudio } from '../lib/notifications';
 
 export interface AddReminderValue {
   title: string;
@@ -88,6 +89,7 @@ export function AddReminderModal({ visible, initial, onClose, onSubmit, onDelete
               disabled={!canSave}
               onPress={() => {
                 if (!canSave) return;
+                primeAudio();
                 onSubmit({ title: title.trim(), fireAt: when, recurringDaily: recurring });
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -171,7 +173,7 @@ const webInputStyle = {
   border: '1px solid rgba(255,247,232,0.08)',
   borderRadius: Radius.chip,
   padding: '12px 14px',
-  fontSize: 15,
+  fontSize: 16,
   fontFamily: 'inherit',
   outline: 'none',
   width: '100%',
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: Colors.text,
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: Fonts.text,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.hairline,

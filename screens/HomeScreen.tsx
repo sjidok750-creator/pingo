@@ -14,6 +14,7 @@ import { AddReminderModal, AddReminderValue } from './AddReminderModal';
 import { Colors, Fonts, Radius } from '../constants/tokens';
 import { useReminders } from '../lib/reminderStore';
 import { toDisplay } from '../lib/format';
+import { primeAudio } from '../lib/notifications';
 
 function StatCard({
   label,
@@ -142,7 +143,10 @@ export function HomeScreen() {
       <View style={styles.fabWrap} pointerEvents="box-none">
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => setAddOpen(true)}
+          onPress={() => {
+            primeAudio();
+            setAddOpen(true);
+          }}
           style={styles.fab}
         >
           <Ionicons name="add" size={28} color="#fff" />
@@ -190,9 +194,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.bg,
+    overflow: 'hidden',
   },
   safeArea: {
     flex: 1,
+    overflow: 'hidden',
   },
   ambientGlow: {
     position: 'absolute',
