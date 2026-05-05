@@ -43,6 +43,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/claude/new-app-project-0fxBY'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
