@@ -90,7 +90,7 @@ function NavTab({
   );
 }
 
-export function HomeScreen() {
+export function HomeScreen({ onAddPress }: { onAddPress: () => void }) {
   return (
     <View style={styles.root}>
       <View style={styles.ambientGlow} pointerEvents="none" />
@@ -139,7 +139,7 @@ export function HomeScreen() {
 
       {/* Floating + button */}
       <View style={styles.fabWrap} pointerEvents="box-none">
-        <TouchableOpacity activeOpacity={0.85}>
+        <TouchableOpacity activeOpacity={0.85} onPress={onAddPress}>
           <LinearGradient
             colors={[Colors.accent, '#5048D9']}
             start={{ x: 0, y: 0 }}
@@ -155,11 +155,11 @@ export function HomeScreen() {
       <View style={styles.navWrap} pointerEvents="box-none">
         {Platform.OS === 'ios' ? (
           <BlurView intensity={60} tint="dark" style={styles.navBar}>
-            <NavTabRow />
+            <NavTabRow onAddPress={onAddPress} />
           </BlurView>
         ) : (
           <View style={[styles.navBar, styles.navBarAndroid]}>
-            <NavTabRow />
+            <NavTabRow onAddPress={onAddPress} />
           </View>
         )}
       </View>
@@ -167,7 +167,7 @@ export function HomeScreen() {
   );
 }
 
-function NavTabRow() {
+function NavTabRow({ onAddPress }: { onAddPress: () => void }) {
   return (
     <>
       <NavTab
@@ -177,6 +177,7 @@ function NavTabRow() {
       />
       <NavTab
         label="추가"
+        onPress={onAddPress}
         icon={<Text style={{ fontSize: 20, color: Colors.textSec }}>+</Text>}
       />
       <NavTab
