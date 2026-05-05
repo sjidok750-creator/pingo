@@ -45,6 +45,28 @@ jobs:
           find dist/_expo -type f -name '*.js' -exec sed -i 's|"/assets/|"/pingo/assets/|g' {} +
           touch dist/.nojekyll
 
+      - name: Add PWA manifest and Android/iOS install icons
+        run: |
+          mkdir -p dist/assets/pwa
+          cp assets/pwa/*.png dist/assets/pwa/
+          cp scripts/manifest.json dist/manifest.json
+          # Inject manifest + apple-touch-icon + theme-color into index.html
+          python3 -c "
+          import re, pathlib
+          p = pathlib.Path('dist/index.html')
+          s = p.read_text()
+          tags = (
+            '<link rel=\"manifest\" href=\"./manifest.json\">'
+            '<link rel=\"apple-touch-icon\" href=\"./assets/pwa/apple-touch-icon.png\">'
+            '<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">'
+            '<meta name=\"apple-mobile-web-app-status-bar-style\" content=\"black-translucent\">'
+            '<meta name=\"apple-mobile-web-app-title\" content=\"Pingo\">'
+            '<meta name=\"theme-color\" content=\"#1B1916\">'
+          )
+          s = s.replace('</head>', tags + '</head>', 1)
+          p.write_text(s)
+          "
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
