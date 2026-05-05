@@ -1,6 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Image,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Radius } from '../constants/tokens';
 import { useReminders } from '../lib/reminderStore';
 import { startAlarmLoop } from '../lib/notifications';
+
+const APP_ICON = require('../assets/icon.png');
 
 function pad(n: number) {
   return n.toString().padStart(2, '0');
@@ -27,14 +33,41 @@ export function AlarmOverlay() {
   const { activeAlarm, dismissAlarm, snoozeAlarm } = useReminders();
   const [tick, setTick] = useState(() => new Date());
 
-  // Tick the clock label every 30s while overlay is shown
+  // Subtle pulse on the app-icon halo while ringing
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!activeAlarm) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 900,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 900,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [activeAlarm, pulse]);
+
+  // Refresh clock label every 30s while ringing
   useEffect(() => {
     if (!activeAlarm) return;
     const id = setInterval(() => setTick(new Date()), 30_000);
     return () => clearInterval(id);
   }, [activeAlarm]);
 
-  // Loop the alarm tone for the entire lifetime of the overlay
+  // Loop the alarm tone for the full lifetime of the overlay
   useEffect(() => {
     if (!activeAlarm) return;
     const stop = startAlarmLoop();
@@ -44,104 +77,133 @@ export function AlarmOverlay() {
   if (!activeAlarm) return null;
   const { time, ampm } = nowLabel(tick);
 
+  const haloScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.25] });
+  const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
+  const iconScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={dismissAlarm}>
-      <View style={styles.root}>
-        <View style={styles.glow} />
-        <View style={styles.top}>
-          <View style={styles.bellWrap}>
-            <Ionicons name="notifications" size={26} color={Colors.accent} />
-            <Text style={styles.label}>ALARM</Text>
+      <View style={styles.backdrop}>
+        <View style={styles.card}>
+          <View style={styles.iconWrap}>
+            <Animated.View
+              style={[
+                styles.halo,
+                { transform: [{ scale: haloScale }], opacity: haloOpacity },
+              ]}
+            />
+            <Animated.View style={[styles.iconShell, { transform: [{ scale: iconScale }] }]}>
+              <Image source={APP_ICON} style={styles.icon} />
+            </Animated.View>
           </View>
-          <View style={styles.clockBlock}>
-            <Text style={styles.time}>{time}</Text>
-            <Text style={styles.ampm}>{ampm}</Text>
+
+          <View style={styles.tagRow}>
+            <Ionicons name="alarm" size={14} color={Colors.accent} />
+            <Text style={styles.tag}>ALARM · {time} {ampm}</Text>
           </View>
+
           <Text style={styles.title} numberOfLines={3}>
             {activeAlarm.title}
           </Text>
-        </View>
 
-        <View style={styles.bottom}>
-          <TouchableOpacity
-            style={styles.snooze}
-            activeOpacity={0.85}
-            onPress={() => snoozeAlarm(5)}
-          >
-            <Ionicons name="moon-outline" size={20} color={Colors.text} />
-            <Text style={styles.snoozeText}>Snooze · 5 min</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.stop}
-            activeOpacity={0.7}
-            onPress={dismissAlarm}
-          >
-            <Text style={styles.stopText}>Stop</Text>
-          </TouchableOpacity>
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={[styles.btn, styles.snooze]}
+              activeOpacity={0.85}
+              onPress={() => snoozeAlarm(5)}
+            >
+              <Ionicons name="moon-outline" size={18} color={Colors.text} />
+              <Text style={styles.snoozeText}>Snooze</Text>
+              <Text style={styles.snoozeHint}>5 min</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, styles.stop]}
+              activeOpacity={0.85}
+              onPress={dismissAlarm}
+            >
+              <Ionicons name="stop" size={18} color="#fff" />
+              <Text style={styles.stopText}>Stop</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
   );
 }
 
+const ICON_SIZE = 84;
+const HALO_SIZE = 132;
+
 const styles = StyleSheet.create({
-  root: {
+  backdrop: {
     flex: 1,
-    backgroundColor: '#0E0D0B',
-    paddingHorizontal: 28,
-    paddingTop: 80,
-    paddingBottom: 40,
-    justifyContent: 'space-between',
+    backgroundColor: 'rgba(8,7,6,0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
   },
-  glow: {
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: Colors.bgElev,
+    borderRadius: Radius.modal,
+    paddingTop: 32,
+    paddingBottom: 18,
+    paddingHorizontal: 22,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairlineStrong,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.55,
+    shadowRadius: 30,
+    elevation: 14,
+  },
+  iconWrap: {
+    width: HALO_SIZE,
+    height: HALO_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  halo: {
     position: 'absolute',
-    top: -120,
-    left: -80,
-    width: 380,
-    height: 380,
-    borderRadius: 190,
-    backgroundColor: 'rgba(218,119,86,0.16)',
+    width: HALO_SIZE,
+    height: HALO_SIZE,
+    borderRadius: HALO_SIZE / 2,
+    backgroundColor: 'rgba(218,119,86,0.32)',
   },
-  top: {
-    alignItems: 'flex-start',
-    gap: 32,
+  iconShell: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: Colors.bg,
+    shadowColor: Colors.accentDeep,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
   },
-  bellWrap: {
+  icon: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+  },
+  tagRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(218,119,86,0.14)',
+    gap: 6,
+    backgroundColor: Colors.accentSoft,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     borderRadius: Radius.pill,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    marginBottom: 14,
   },
-  label: {
+  tag: {
     fontFamily: Fonts.text,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: Colors.accent,
-    letterSpacing: 1.4,
-  },
-  clockBlock: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  time: {
-    fontFamily: Fonts.display,
-    fontSize: 88,
-    fontWeight: '300',
-    color: Colors.text,
-    letterSpacing: -3,
-    lineHeight: 92,
-  },
-  ampm: {
-    fontFamily: Fonts.display,
-    fontSize: 22,
-    fontWeight: '500',
-    color: Colors.textSec,
-    letterSpacing: -0.5,
-    marginBottom: 14,
+    letterSpacing: 1.0,
   },
   title: {
     fontFamily: Fonts.display,
@@ -150,37 +212,55 @@ const styles = StyleSheet.create({
     color: Colors.text,
     letterSpacing: -0.4,
     lineHeight: 28,
+    textAlign: 'center',
+    marginBottom: 26,
+    paddingHorizontal: 4,
   },
-  bottom: {
-    gap: 14,
+  btnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
   },
-  snooze: {
+  btn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 18,
+    gap: 6,
+    paddingVertical: 16,
     borderRadius: Radius.pill,
+  },
+  snooze: {
     backgroundColor: 'rgba(255,247,232,0.08)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.hairlineStrong,
   },
   snoozeText: {
     fontFamily: Fonts.display,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.text,
     letterSpacing: -0.2,
   },
+  snoozeHint: {
+    fontFamily: Fonts.text,
+    fontSize: 13,
+    fontWeight: '500',
+    color: Colors.textSec,
+    marginLeft: 2,
+  },
   stop: {
-    paddingVertical: 14,
-    alignItems: 'center',
+    backgroundColor: Colors.accent,
+    shadowColor: Colors.accentDeep,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
   },
   stopText: {
-    fontFamily: Fonts.text,
+    fontFamily: Fonts.display,
     fontSize: 15,
-    fontWeight: '600',
-    color: Colors.accent,
-    letterSpacing: 0.2,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
   },
 });
