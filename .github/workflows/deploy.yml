@@ -5,12 +5,18 @@ on:
     branches:
       - claude/new-app-project-0fxBY
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,27 +24,32 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build web
         run: npx expo export --platform web
-        env:
-          NODE_ENV: production
 
-      - name: Fix asset paths for GitHub Pages
+      - name: Fix asset paths
         run: |
           sed -i 's|src="/_expo/|src="./_expo/|g' dist/index.html
           sed -i 's|href="/favicon.ico"|href="./favicon.ico"|g' dist/index.html
+          touch dist/.nojekyll
 
-      - name: Add .nojekyll
-        run: touch dist/.nojekyll
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
-          publish_branch: gh-pages
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
