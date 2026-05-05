@@ -14,15 +14,36 @@ import { Colors, Fonts, Radius } from '../constants/tokens';
 
 type WaveType = 'sine' | 'square' | 'triangle' | 'sawtooth';
 
+type Note = { f: number; d: number };
+
 type Ringtone = {
   id: string;
   name: string;
+  // Simple repeated-pitch playback
   freq: number;
   type: WaveType;
   pattern?: number[];
+  // Optional melody (overrides simple pattern). FM-bell style synthesis.
+  melody?: Note[];
+  bell?: boolean;
 };
 
+// Approximation of the iOS "Radial" alarm tone — a quick repeating bell-like
+// motif. We can't ship Apple's audio (proprietary), so this is synthesized.
+const RADIAL_MOTIF: Note[] = [
+  { f: 1318.5, d: 0.18 }, // E6
+  { f: 1760.0, d: 0.18 }, // A6
+  { f: 1318.5, d: 0.18 },
+  { f: 1108.7, d: 0.26 }, // C#6
+  { f: 0,      d: 0.18 }, // rest
+  { f: 1318.5, d: 0.18 },
+  { f: 1760.0, d: 0.18 },
+  { f: 1318.5, d: 0.18 },
+  { f: 880.0,  d: 0.34 }, // A5
+];
+
 const STANDARD: Ringtone[] = [
+  { id: 'radial', name: 'Radial', freq: 1318.5, type: 'sine', melody: RADIAL_MOTIF, bell: true },
   { id: 'pingo', name: 'Pingo', freq: 880, type: 'sine', pattern: [0.12, 0.08, 0.12] },
   { id: 'pulse', name: 'Pulse', freq: 660, type: 'square', pattern: [0.08, 0.06, 0.08, 0.06, 0.12] },
   { id: 'soft', name: 'Soft', freq: 740, type: 'triangle', pattern: [0.18, 0.14, 0.22] },
@@ -37,6 +58,30 @@ const CLASSIC: Ringtone[] = [
   { id: 'analog', name: 'Analog', freq: 587, type: 'sawtooth', pattern: [0.14, 0.1, 0.14, 0.1, 0.18] },
 ];
 
+// Bell-like FM voice: carrier sine + inharmonic modulator, fast attack,
+// long decay. Produces a clean metallic ping similar to iOS alarm tones.
+function playBellNote(ctx: any, t: number, freq: number, dur: number, peak = 0.22) {
+  if (freq <= 0) return; // rest
+  const carrier = ctx.createOscillator();
+  const carrierGain = ctx.createGain();
+  const modulator = ctx.createOscillator();
+  const modGain = ctx.createGain();
+  carrier.type = 'sine';
+  modulator.type = 'sine';
+  carrier.frequency.value = freq;
+  modulator.frequency.value = freq * 2.76; // inharmonic ratio gives bell timbre
+  modGain.gain.value = freq * 1.4;
+  modulator.connect(modGain).connect(carrier.frequency);
+  carrierGain.gain.setValueAtTime(0, t);
+  carrierGain.gain.linearRampToValueAtTime(peak, t + 0.005);
+  carrierGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  carrier.connect(carrierGain).connect(ctx.destination);
+  modulator.start(t);
+  carrier.start(t);
+  modulator.stop(t + dur + 0.05);
+  carrier.stop(t + dur + 0.05);
+}
+
 function playTone(rt: Ringtone) {
   if (Platform.OS !== 'web') return;
   if (typeof window === 'undefined') return;
@@ -45,28 +90,52 @@ function playTone(rt: Ringtone) {
   if (!AudioCtx) return;
   const ctx = new AudioCtx();
   const now = ctx.currentTime;
-  const pattern = rt.pattern && rt.pattern.length > 0 ? rt.pattern : [0.25];
-  const gap = 0.06;
   let t = now;
-  pattern.forEach((dur, i) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = rt.type;
-    const detune = i % 2 === 0 ? 0 : 4;
-    osc.frequency.value = rt.freq;
-    osc.detune.value = detune * 100;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start(t);
-    osc.stop(t + dur + 0.02);
-    t += dur + gap;
-  });
-  const total = (t - now) * 1000 + 50;
+  let endT = now;
+
+  if (rt.melody && rt.melody.length > 0) {
+    rt.melody.forEach(({ f, d }) => {
+      if (rt.bell) playBellNote(ctx, t, f, d);
+      else if (f > 0) {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = rt.type;
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t);
+        osc.stop(t + d + 0.02);
+      }
+      t += d;
+    });
+    endT = t;
+  } else {
+    const pattern = rt.pattern && rt.pattern.length > 0 ? rt.pattern : [0.25];
+    const gap = 0.06;
+    pattern.forEach((dur, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = rt.type;
+      const detune = i % 2 === 0 ? 0 : 4;
+      osc.frequency.value = rt.freq;
+      osc.detune.value = detune * 100;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+      t += dur + gap;
+    });
+    endT = t;
+  }
+
+  const totalMs = (endT - now) * 1000 + 200;
   setTimeout(() => {
     ctx.close().catch(() => {});
-  }, total);
+  }, totalMs);
 }
 
 function RingtoneRow({
