@@ -62,24 +62,30 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const list = await load();
-      if (!mounted) return;
-      setReminders(list);
-      setReady(true);
-      // Re-schedule on web (timers are volatile across reloads)
-      // and request permission so the user sees the prompt early.
-      ensurePermissionAsync().catch(() => {});
-      for (const r of list) {
-        const fire = new Date(r.fireAt);
-        if (fire.getTime() > Date.now() || r.recurringDaily) {
-          await scheduleAsync({
-            id: r.id,
-            title: 'Pingo 알림',
-            body: r.title,
-            fireAt: fire,
-            recurringDaily: r.recurringDaily,
-          });
+      try {
+        const list = await load();
+        if (!mounted) return;
+        setReminders(list);
+        setReady(true);
+        // Re-schedule on web (timers are volatile across reloads)
+        for (const r of list) {
+          try {
+            const fire = new Date(r.fireAt);
+            if (fire.getTime() > Date.now() || r.recurringDaily) {
+              await scheduleAsync({
+                id: r.id,
+                title: 'Pingo 알림',
+                body: r.title,
+                fireAt: fire,
+                recurringDaily: r.recurringDaily,
+              });
+            }
+          } catch {
+            // continue with next reminder
+          }
         }
+      } catch {
+        if (mounted) setReady(true);
       }
     })();
     return () => {

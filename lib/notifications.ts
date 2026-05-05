@@ -1,32 +1,29 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
-let webHandlersInitialized = false;
-let nativeHandlersInitialized = false;
 const webTimers = new Map<string, number>();
+let nativeHandlersInitialized = false;
 
 function initNativeHandlers() {
   if (nativeHandlersInitialized) return;
   nativeHandlersInitialized = true;
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-}
-
-function initWebHandlers() {
-  if (webHandlersInitialized) return;
-  webHandlersInitialized = true;
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {
+    // ignore
+  }
 }
 
 export async function ensurePermissionAsync(): Promise<boolean> {
   if (Platform.OS === 'web') {
-    initWebHandlers();
     if (typeof window === 'undefined' || typeof (window as any).Notification === 'undefined') {
       return false;
     }
@@ -41,11 +38,15 @@ export async function ensurePermissionAsync(): Promise<boolean> {
     }
   }
 
-  initNativeHandlers();
-  const { status } = await Notifications.getPermissionsAsync();
-  if (status === 'granted') return true;
-  const req = await Notifications.requestPermissionsAsync();
-  return req.status === 'granted';
+  try {
+    initNativeHandlers();
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status === 'granted') return true;
+    const req = await Notifications.requestPermissionsAsync();
+    return req.status === 'granted';
+  } catch {
+    return false;
+  }
 }
 
 function playWebRingtone() {
@@ -86,9 +87,7 @@ export async function scheduleAsync(args: {
   const ms = args.fireAt.getTime() - Date.now();
 
   if (Platform.OS === 'web') {
-    initWebHandlers();
     if (typeof window === 'undefined') return null;
-    // Clear existing timer for this id
     const existing = webTimers.get(args.id);
     if (existing) {
       clearTimeout(existing);
@@ -110,35 +109,37 @@ export async function scheduleAsync(args: {
         webTimers.delete(args.id);
       }
     };
-    // setTimeout only safe up to ~24.8 days for 32-bit. Cap at 24h here.
     const safe = Math.min(ms, 24 * 60 * 60 * 1000);
     const handle = window.setTimeout(fire, safe);
     webTimers.set(args.id, handle);
     return args.id;
   }
 
-  initNativeHandlers();
-  // Schedule a date-based trigger
-  const trigger = args.recurringDaily
-    ? ({
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: args.fireAt.getHours(),
-        minute: args.fireAt.getMinutes(),
-      } as Notifications.DailyTriggerInput)
-    : ({
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: args.fireAt,
-      } as Notifications.DateTriggerInput);
+  try {
+    initNativeHandlers();
+    const trigger = args.recurringDaily
+      ? {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: args.fireAt.getHours(),
+          minute: args.fireAt.getMinutes(),
+        }
+      : {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: args.fireAt,
+        };
 
-  const notifId = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: args.title,
-      body: args.body,
-      sound: 'default',
-    },
-    trigger,
-  });
-  return notifId;
+    const notifId = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: args.title,
+        body: args.body,
+        sound: 'default',
+      },
+      trigger: trigger as any,
+    });
+    return notifId;
+  } catch {
+    return null;
+  }
 }
 
 export async function cancelAsync(args: {
