@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { HomeScreen } from './screens/HomeScreen';
+import { AlarmOverlay } from './screens/AlarmOverlay';
 import { ReminderProvider } from './lib/reminderStore';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -38,6 +39,7 @@ export default function App() {
       <ReminderProvider>
         <StatusBar style="light" />
         <HomeScreen />
+        <AlarmOverlay />
       </ReminderProvider>
     </ErrorBoundary>
   );

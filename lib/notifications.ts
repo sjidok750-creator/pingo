@@ -76,6 +76,85 @@ export function primeAudio(): void {
   }
 }
 
+// Bell-like FM voice for alarm tones. Carrier sine + inharmonic modulator.
+function scheduleBellNote(ctx: any, t: number, freq: number, dur: number, peak = 0.28) {
+  if (freq <= 0) return;
+  const carrier = ctx.createOscillator();
+  const carrierGain = ctx.createGain();
+  const modulator = ctx.createOscillator();
+  const modGain = ctx.createGain();
+  carrier.type = 'sine';
+  modulator.type = 'sine';
+  carrier.frequency.value = freq;
+  modulator.frequency.value = freq * 2.76;
+  modGain.gain.value = freq * 1.4;
+  modulator.connect(modGain).connect(carrier.frequency);
+  carrierGain.gain.setValueAtTime(0, t);
+  carrierGain.gain.linearRampToValueAtTime(peak, t + 0.005);
+  carrierGain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  carrier.connect(carrierGain).connect(ctx.destination);
+  modulator.start(t);
+  carrier.start(t);
+  modulator.stop(t + dur + 0.05);
+  carrier.stop(t + dur + 0.05);
+}
+
+const RADIAL_MOTIF: Array<[number, number]> = [
+  [1318.5, 0.18], [1760.0, 0.18], [1318.5, 0.18], [1108.7, 0.26],
+  [0, 0.18],
+  [1318.5, 0.18], [1760.0, 0.18], [1318.5, 0.18], [880.0, 0.34],
+];
+
+// Plays one iteration of the alarm motif. Returns the duration in ms
+// so the caller can schedule the next repetition seamlessly.
+export function playAlarmTone(): number {
+  if (typeof window === 'undefined') return 0;
+  const w = window as any;
+  const AudioCtx = w.AudioContext || w.webkitAudioContext;
+  if (!AudioCtx) return 0;
+  try {
+    const ctx = sharedAudioCtx || (sharedAudioCtx = new AudioCtx());
+    if (ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+      ctx.resume().catch(() => {});
+    }
+    let t = ctx.currentTime;
+    const start = t;
+    RADIAL_MOTIF.forEach(([f, d]) => {
+      scheduleBellNote(ctx, t, f, d);
+      t += d;
+    });
+    return Math.round((t - start) * 1000);
+  } catch {
+    return 0;
+  }
+}
+
+// Loop the alarm tone until the returned cleanup is called. Used by the
+// in-app AlarmOverlay so the alarm keeps ringing until the user dismisses.
+export function startAlarmLoop(): () => void {
+  let stopped = false;
+  let timer: any = null;
+  const tick = () => {
+    if (stopped) return;
+    const dur = playAlarmTone();
+    // Small inter-loop gap so it feels like a real alarm
+    timer = setTimeout(tick, Math.max(dur, 1500) + 250);
+  };
+  tick();
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
+// Subscriber for alarm-fire events (set by reminderStore, called from the
+// scheduled setTimeout when the alarm time arrives).
+type AlarmFireHandler = (info: { id: string; title: string }) => void;
+let alarmFireHandler: AlarmFireHandler | null = null;
+export function setAlarmFireHandler(h: AlarmFireHandler | null) {
+  alarmFireHandler = h;
+}
+
 function playWebRingtone() {
   if (typeof window === 'undefined') return;
   const w = window as any;
@@ -133,7 +212,14 @@ export async function scheduleAsync(args: {
           new N(args.title, { body: args.body });
         }
       } catch {}
-      playWebRingtone();
+      // Hand off to the in-app overlay (handles audio loop + Stop/Snooze).
+      // If no handler is registered (e.g. before app fully mounted), fall
+      // back to a single ringtone tick so the user still hears something.
+      if (alarmFireHandler) {
+        alarmFireHandler({ id: args.id, title: args.body });
+      } else {
+        playWebRingtone();
+      }
       if (args.recurringDaily) {
         const next = new Date(args.fireAt.getTime() + 24 * 60 * 60 * 1000);
         scheduleAsync({ ...args, fireAt: next });

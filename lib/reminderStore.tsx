@@ -1,7 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StoredReminder } from './types';
-import { cancelAsync, ensurePermissionAsync, scheduleAsync } from './notifications';
+import { cancelAsync, ensurePermissionAsync, scheduleAsync, setAlarmFireHandler } from './notifications';
+
+export interface ActiveAlarm {
+  id: string;
+  title: string;
+  firedAt: number;
+}
 
 const STORAGE_KEY = '@pingo/reminders/v1';
 
@@ -11,8 +17,11 @@ interface Ctx {
   add: (input: NewReminder) => Promise<StoredReminder>;
   update: (id: string, patch: Partial<NewReminder>) => Promise<void>;
   remove: (id: string) => Promise<void>;
-  // Test helper: schedule a one-off in N seconds
   scheduleTest: (seconds: number, title?: string) => Promise<StoredReminder>;
+  // In-app alarm overlay state
+  activeAlarm: ActiveAlarm | null;
+  dismissAlarm: () => void;
+  snoozeAlarm: (minutes?: number) => void;
 }
 
 export interface NewReminder {
@@ -56,8 +65,17 @@ async function load(): Promise<StoredReminder[]> {
 export function ReminderProvider({ children }: { children: React.ReactNode }) {
   const [reminders, setReminders] = useState<StoredReminder[]>([]);
   const [ready, setReady] = useState(false);
+  const [activeAlarm, setActiveAlarm] = useState<ActiveAlarm | null>(null);
   const remindersRef = useRef(reminders);
   remindersRef.current = reminders;
+
+  // Receive alarm-fire callbacks from the scheduling layer.
+  useEffect(() => {
+    setAlarmFireHandler(({ id, title }) => {
+      setActiveAlarm({ id, title, firedAt: Date.now() });
+    });
+    return () => setAlarmFireHandler(null);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -159,16 +177,47 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const scheduleTest = useCallback(
-    async (seconds: number, title = '테스트 알림'): Promise<StoredReminder> => {
+    async (seconds: number, title = 'Test alarm'): Promise<StoredReminder> => {
       const fireAt = new Date(Date.now() + seconds * 1000);
       return add({ title, fireAt });
     },
     [add],
   );
 
+  const dismissAlarm = useCallback(() => {
+    setActiveAlarm(null);
+  }, []);
+
+  const snoozeAlarm = useCallback(
+    (minutes = 5) => {
+      const current = activeAlarm;
+      setActiveAlarm(null);
+      if (!current) return;
+      const fireAt = new Date(Date.now() + minutes * 60 * 1000);
+      // Reuse the original reminder id so a Stop later still cancels it.
+      scheduleAsync({
+        id: current.id,
+        title: 'Pingo',
+        body: current.title,
+        fireAt,
+      }).catch(() => {});
+    },
+    [activeAlarm],
+  );
+
   const value = useMemo(
-    () => ({ ready, reminders, add, update, remove, scheduleTest }),
-    [ready, reminders, add, update, remove, scheduleTest],
+    () => ({
+      ready,
+      reminders,
+      add,
+      update,
+      remove,
+      scheduleTest,
+      activeAlarm,
+      dismissAlarm,
+      snoozeAlarm,
+    }),
+    [ready, reminders, add, update, remove, scheduleTest, activeAlarm, dismissAlarm, snoozeAlarm],
   );
 
   return <ReminderContext.Provider value={value}>{children}</ReminderContext.Provider>;
