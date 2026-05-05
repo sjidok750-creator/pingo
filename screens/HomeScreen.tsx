@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,37 +8,12 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ReminderCard, Reminder } from '../components/ReminderCard';
+import { SwipeableReminderCard } from '../components/SwipeableReminderCard';
 import { RingtonePickerScreen } from './RingtonePickerScreen';
+import { AddReminderModal, AddReminderValue } from './AddReminderModal';
 import { Colors, Fonts, Radius } from '../constants/tokens';
-
-const DUMMY_REMINDERS: Reminder[] = [
-  {
-    id: 1,
-    title: '비타민 복용',
-    dday: 0,
-    ddayLabel: 'D-DAY',
-    next: '오늘 오후 9시 알림',
-    urgency: 'red',
-    recurring: true,
-  },
-  {
-    id: 2,
-    title: '계약서 제출 마감',
-    dday: 3,
-    ddayLabel: 'D-3',
-    next: '내일 오전 9시 알림',
-    urgency: 'amber',
-  },
-  {
-    id: 3,
-    title: '자동차 정기검사',
-    dday: 12,
-    ddayLabel: 'D-12',
-    next: '5월 17일 오전 10시 알림',
-    urgency: 'green',
-  },
-];
+import { useReminders } from '../lib/reminderStore';
+import { toDisplay } from '../lib/format';
 
 function PlusIcon({ color = '#fff', size = 24 }: { color?: string; size?: number }) {
   return (
@@ -70,8 +45,41 @@ function StatCard({
   );
 }
 
+function formatUntil(ms: number): { value: string; unit: string } {
+  if (ms <= 0) return { value: '0', unit: '분' };
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 60) return { value: String(totalMin), unit: '분' };
+  const hours = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  if (hours < 24) return { value: String(hours), unit: min ? `시간 ${min}분` : '시간' };
+  const days = Math.floor(hours / 24);
+  const remH = hours % 24;
+  return { value: String(days), unit: remH ? `일 ${remH}시간` : '일' };
+}
+
 export function HomeScreen() {
+  const { ready, reminders, add, update, remove } = useReminders();
   const [ringtoneOpen, setRingtoneOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [openCardId, setOpenCardId] = useState<string | null>(null);
+
+  const sorted = useMemo(
+    () => [...reminders].sort((a, b) => new Date(a.fireAt).getTime() - new Date(b.fireAt).getTime()),
+    [reminders],
+  );
+
+  const next = sorted.find((r) => new Date(r.fireAt).getTime() > Date.now());
+  const untilNext = next ? formatUntil(new Date(next.fireAt).getTime() - Date.now()) : null;
+
+  const editingReminder = editingId ? reminders.find((r) => r.id === editingId) : undefined;
+  const editingInitial: AddReminderValue | undefined = editingReminder
+    ? {
+        title: editingReminder.title,
+        fireAt: new Date(editingReminder.fireAt),
+        recurringDaily: !!editingReminder.recurringDaily,
+      }
+    : undefined;
 
   return (
     <View style={styles.root}>
@@ -82,8 +90,8 @@ export function HomeScreen() {
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          onScrollBeginDrag={() => setOpenCardId(null)}
         >
-          {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <Text style={styles.wordmark}>
@@ -100,32 +108,46 @@ export function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Stats strip */}
           <View style={styles.statsRow}>
-            <StatCard label="활성 알림" value="3" unit="개" />
+            <StatCard label="활성 알림" value={String(reminders.length)} unit="개" />
             <StatCard
               label="다음 알림까지"
-              value="4"
-              unit="시간 12분"
+              value={untilNext ? untilNext.value : '-'}
+              unit={untilNext ? untilNext.unit : ''}
               valueColor={Colors.accent}
             />
           </View>
 
-          {/* Section label */}
           <Text style={styles.sectionLabel}>예정된 일정</Text>
 
-          {/* Reminder cards */}
-          <View style={styles.cardList}>
-            {DUMMY_REMINDERS.map((r) => (
-              <ReminderCard key={r.id} r={r} />
-            ))}
-          </View>
+          {ready && sorted.length === 0 ? (
+            <View style={styles.empty}>
+              <Text style={styles.emptyTitle}>아직 등록된 알림이 없어요</Text>
+              <Text style={styles.emptyBody}>오른쪽 아래 + 버튼으로 첫 리마인더를 만들어보세요.</Text>
+            </View>
+          ) : (
+            <View style={styles.cardList}>
+              {sorted.map((s) => {
+                const display = toDisplay(s);
+                return (
+                  <SwipeableReminderCard
+                    key={s.id}
+                    r={display}
+                    isOpen={openCardId === s.id}
+                    onOpen={() => setOpenCardId(s.id)}
+                    onClose={() => setOpenCardId((cur) => (cur === s.id ? null : cur))}
+                    onEdit={() => setEditingId(s.id)}
+                    onDelete={() => remove(s.id)}
+                  />
+                );
+              })}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
-      {/* Floating + button */}
       <View style={styles.fabWrap} pointerEvents="box-none">
-        <TouchableOpacity activeOpacity={0.85}>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => setAddOpen(true)}>
           <LinearGradient
             colors={[Colors.accent, '#5048D9']}
             start={{ x: 0, y: 0 }}
@@ -136,6 +158,35 @@ export function HomeScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      <AddReminderModal
+        visible={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={async (v) => {
+          await add({ title: v.title, fireAt: v.fireAt, recurringDaily: v.recurringDaily });
+          setAddOpen(false);
+        }}
+      />
+
+      <AddReminderModal
+        visible={!!editingId}
+        initial={editingInitial}
+        onClose={() => setEditingId(null)}
+        onSubmit={async (v) => {
+          if (!editingId) return;
+          await update(editingId, {
+            title: v.title,
+            fireAt: v.fireAt,
+            recurringDaily: v.recurringDaily,
+          });
+          setEditingId(null);
+        }}
+        onDelete={async () => {
+          if (!editingId) return;
+          await remove(editingId);
+          setEditingId(null);
+        }}
+      />
 
       <RingtonePickerScreen
         visible={ringtoneOpen}
@@ -262,6 +313,29 @@ const styles = StyleSheet.create({
   cardList: {
     paddingHorizontal: 20,
     gap: 10,
+  },
+  empty: {
+    marginHorizontal: 20,
+    paddingVertical: 36,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.card,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.05)',
+    gap: 6,
+  },
+  emptyTitle: {
+    fontFamily: Fonts.display,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  emptyBody: {
+    fontFamily: Fonts.text,
+    fontSize: 13,
+    color: Colors.textSec,
+    textAlign: 'center',
   },
   fabWrap: {
     position: 'absolute',
