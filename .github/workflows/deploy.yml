@@ -36,8 +36,13 @@ jobs:
 
       - name: Fix asset paths
         run: |
+          # index.html: relative paths so the page works under /pingo/
           sed -i 's|src="/_expo/|src="./_expo/|g' dist/index.html
           sed -i 's|href="/favicon.ico"|href="./favicon.ico"|g' dist/index.html
+          # bundle: rewrite hard-coded absolute "/assets/..." (used by
+          # @expo/vector-icons font URLs) to "/pingo/assets/..." so they
+          # resolve correctly under the GitHub Pages subpath.
+          find dist/_expo -type f -name '*.js' -exec sed -i 's|"/assets/|"/pingo/assets/|g' {} +
           touch dist/.nojekyll
 
       - name: Upload Pages artifact
