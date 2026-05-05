@@ -131,19 +131,38 @@ export function playAlarmTone(): number {
 
 // Loop the alarm tone until the returned cleanup is called. Used by the
 // in-app AlarmOverlay so the alarm keeps ringing until the user dismisses.
+// Also fires a vibration pattern on every iteration — works through phone
+// calls and lock screens on Android Chrome (iOS Safari silently ignores).
 export function startAlarmLoop(): () => void {
   let stopped = false;
   let timer: any = null;
+  const vibrate = () => {
+    if (typeof navigator === 'undefined') return;
+    const v = (navigator as any).vibrate;
+    if (typeof v === 'function') {
+      try {
+        v.call(navigator, [600, 250, 600, 250, 800]);
+      } catch {
+        // ignore
+      }
+    }
+  };
   const tick = () => {
     if (stopped) return;
     const dur = playAlarmTone();
-    // Small inter-loop gap so it feels like a real alarm
+    vibrate();
     timer = setTimeout(tick, Math.max(dur, 1500) + 250);
   };
   tick();
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
+    if (typeof navigator !== 'undefined') {
+      const v = (navigator as any).vibrate;
+      if (typeof v === 'function') {
+        try { v.call(navigator, 0); } catch {}
+      }
+    }
   };
 }
 

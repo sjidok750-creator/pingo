@@ -29,26 +29,28 @@ function nowLabel(d: Date) {
   return { time: `${h12}:${pad(m)}`, ampm };
 }
 
-export function AlarmOverlay() {
-  const { activeAlarm, dismissAlarm, snoozeAlarm } = useReminders();
-  const [tick, setTick] = useState(() => new Date());
+function dateLabel(d: Date) {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
 
-  // Subtle pulse on the app-icon halo while ringing
-  const pulse = useRef(new Animated.Value(0)).current;
+function usePulse(active: boolean) {
+  const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (!activeAlarm) {
-      pulse.setValue(0);
+    if (!active) {
+      v.setValue(0);
       return;
     }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, {
+        Animated.timing(v, {
           toValue: 1,
           duration: 900,
           easing: Easing.out(Easing.quad),
           useNativeDriver: Platform.OS !== 'web',
         }),
-        Animated.timing(pulse, {
+        Animated.timing(v, {
           toValue: 0,
           duration: 900,
           easing: Easing.in(Easing.quad),
@@ -58,16 +60,21 @@ export function AlarmOverlay() {
     );
     loop.start();
     return () => loop.stop();
-  }, [activeAlarm, pulse]);
+  }, [active, v]);
+  return v;
+}
 
-  // Refresh clock label every 30s while ringing
+export function AlarmOverlay() {
+  const { activeAlarm, dismissAlarm, snoozeAlarm } = useReminders();
+  const [tick, setTick] = useState(() => new Date());
+  const pulse = usePulse(!!activeAlarm);
+
   useEffect(() => {
     if (!activeAlarm) return;
     const id = setInterval(() => setTick(new Date()), 30_000);
     return () => clearInterval(id);
   }, [activeAlarm]);
 
-  // Loop the alarm tone for the full lifetime of the overlay
   useEffect(() => {
     if (!activeAlarm) return;
     const stop = startAlarmLoop();
@@ -76,53 +83,113 @@ export function AlarmOverlay() {
 
   if (!activeAlarm) return null;
   const { time, ampm } = nowLabel(tick);
-
+  const date = dateLabel(tick);
   const haloScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.25] });
   const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
   const iconScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
 
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={dismissAlarm}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <Animated.View
-              style={[
-                styles.halo,
-                { transform: [{ scale: haloScale }], opacity: haloOpacity },
-              ]}
-            />
-            <Animated.View style={[styles.iconShell, { transform: [{ scale: iconScale }] }]}>
-              <Image source={APP_ICON} style={styles.icon} />
-            </Animated.View>
+  // Two layouts:
+  //   Foreground (default): centered alert card overlaying current screen
+  //   Returned-from-background: black full-screen alarm (iOS lock-style)
+  if (activeAlarm.firedWhileHidden) {
+    return (
+      <Modal visible transparent={false} animationType="fade" onRequestClose={dismissAlarm}>
+        <View style={fs.root}>
+          <View style={fs.header}>
+            <Text style={fs.date}>{date}</Text>
+            <Text style={fs.bigTime}>
+              {time}
+              <Text style={fs.ampm}> {ampm}</Text>
+            </Text>
           </View>
 
-          <View style={styles.tagRow}>
-            <Ionicons name="alarm" size={14} color={Colors.accent} />
-            <Text style={styles.tag}>ALARM · {time} {ampm}</Text>
+          <View style={fs.middle}>
+            <View style={fs.iconWrap}>
+              <Animated.View
+                style={[fs.halo, { transform: [{ scale: haloScale }], opacity: haloOpacity }]}
+              />
+              <Animated.View style={[fs.iconShell, { transform: [{ scale: iconScale }] }]}>
+                <Image source={APP_ICON} style={fs.icon} />
+              </Animated.View>
+            </View>
+
+            <View style={fs.tagRow}>
+              <Ionicons name="alarm" size={14} color={Colors.accent} />
+              <Text style={fs.tag}>ALARM</Text>
+            </View>
+
+            <Text style={fs.title} numberOfLines={4}>
+              {activeAlarm.title}
+            </Text>
           </View>
 
-          <Text style={styles.title} numberOfLines={3}>
-            {activeAlarm.title}
-          </Text>
-
-          <View style={styles.btnRow}>
+          <View style={fs.bottom}>
             <TouchableOpacity
-              style={[styles.btn, styles.snooze]}
+              style={fs.snooze}
               activeOpacity={0.85}
               onPress={() => snoozeAlarm(5)}
             >
-              <Ionicons name="moon-outline" size={18} color={Colors.text} />
-              <Text style={styles.snoozeText}>Snooze</Text>
-              <Text style={styles.snoozeHint}>5 min</Text>
+              <Ionicons name="moon-outline" size={20} color={Colors.text} />
+              <Text style={fs.snoozeText}>Snooze</Text>
+              <Text style={fs.snoozeHint}>5 min</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.btn, styles.stop]}
+              style={fs.stop}
               activeOpacity={0.85}
               onPress={dismissAlarm}
             >
               <Ionicons name="stop" size={18} color="#fff" />
-              <Text style={styles.stopText}>Stop</Text>
+              <Text style={fs.stopText}>Stop</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Foreground: centered card
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={dismissAlarm}>
+      <View style={card.backdrop}>
+        <View style={card.card}>
+          <View style={card.iconWrap}>
+            <Animated.View
+              style={[
+                card.halo,
+                { transform: [{ scale: haloScale }], opacity: haloOpacity },
+              ]}
+            />
+            <Animated.View style={[card.iconShell, { transform: [{ scale: iconScale }] }]}>
+              <Image source={APP_ICON} style={card.icon} />
+            </Animated.View>
+          </View>
+
+          <View style={card.tagRow}>
+            <Ionicons name="alarm" size={14} color={Colors.accent} />
+            <Text style={card.tag}>ALARM · {time} {ampm}</Text>
+          </View>
+
+          <Text style={card.title} numberOfLines={3}>
+            {activeAlarm.title}
+          </Text>
+
+          <View style={card.btnRow}>
+            <TouchableOpacity
+              style={[card.btn, card.snooze]}
+              activeOpacity={0.85}
+              onPress={() => snoozeAlarm(5)}
+            >
+              <Ionicons name="moon-outline" size={18} color={Colors.text} />
+              <Text style={card.snoozeText}>Snooze</Text>
+              <Text style={card.snoozeHint}>5 min</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[card.btn, card.stop]}
+              activeOpacity={0.85}
+              onPress={dismissAlarm}
+            >
+              <Ionicons name="stop" size={18} color="#fff" />
+              <Text style={card.stopText}>Stop</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -134,7 +201,8 @@ export function AlarmOverlay() {
 const ICON_SIZE = 84;
 const HALO_SIZE = 132;
 
-const styles = StyleSheet.create({
+// Foreground: centered alert card
+const card = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(8,7,6,0.72)',
@@ -184,10 +252,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 16,
   },
-  icon: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-  },
+  icon: { width: ICON_SIZE, height: ICON_SIZE },
   tagRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -216,11 +281,7 @@ const styles = StyleSheet.create({
     marginBottom: 26,
     paddingHorizontal: 4,
   },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-  },
+  btnRow: { flexDirection: 'row', gap: 10, width: '100%' },
   btn: {
     flex: 1,
     flexDirection: 'row',
@@ -259,6 +320,140 @@ const styles = StyleSheet.create({
   stopText: {
     fontFamily: Fonts.display,
     fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+});
+
+// Returned-from-background: black full-screen lock-style alarm
+const fs = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#000',
+    paddingHorizontal: 28,
+    paddingTop: 60,
+    paddingBottom: 40,
+    justifyContent: 'space-between',
+  },
+  header: { alignItems: 'center', gap: 4 },
+  date: {
+    fontFamily: Fonts.text,
+    fontSize: 15,
+    fontWeight: '500',
+    color: 'rgba(255,247,232,0.65)',
+    letterSpacing: 0.2,
+  },
+  bigTime: {
+    fontFamily: Fonts.display,
+    fontSize: 92,
+    fontWeight: '200',
+    color: '#fff',
+    letterSpacing: -3,
+    lineHeight: 96,
+  },
+  ampm: {
+    fontFamily: Fonts.display,
+    fontSize: 28,
+    fontWeight: '400',
+    color: 'rgba(255,247,232,0.65)',
+    letterSpacing: -0.5,
+  },
+  middle: { alignItems: 'center', gap: 18 },
+  iconWrap: {
+    width: HALO_SIZE,
+    height: HALO_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  halo: {
+    position: 'absolute',
+    width: HALO_SIZE,
+    height: HALO_SIZE,
+    borderRadius: HALO_SIZE / 2,
+    backgroundColor: 'rgba(218,119,86,0.36)',
+  },
+  iconShell: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+    borderRadius: 22,
+    overflow: 'hidden',
+    backgroundColor: '#1B1916',
+    shadowColor: Colors.accentDeep,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.6,
+    shadowRadius: 18,
+  },
+  icon: { width: ICON_SIZE, height: ICON_SIZE },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(218,119,86,0.18)',
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: Radius.pill,
+  },
+  tag: {
+    fontFamily: Fonts.text,
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.accent,
+    letterSpacing: 1.4,
+  },
+  title: {
+    fontFamily: Fonts.display,
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#fff',
+    letterSpacing: -0.4,
+    lineHeight: 30,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+    marginTop: 4,
+  },
+  bottom: { gap: 12 },
+  snooze: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 18,
+    borderRadius: Radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  snoozeText: {
+    fontFamily: Fonts.display,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#fff',
+    letterSpacing: -0.2,
+  },
+  snoozeHint: {
+    fontFamily: Fonts.text,
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgba(255,255,255,0.55)',
+    marginLeft: 2,
+  },
+  stop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 18,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.accent,
+    shadowColor: Colors.accentDeep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+  },
+  stopText: {
+    fontFamily: Fonts.display,
+    fontSize: 17,
     fontWeight: '700',
     color: '#fff',
     letterSpacing: -0.2,

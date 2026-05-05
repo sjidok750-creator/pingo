@@ -7,6 +7,9 @@ export interface ActiveAlarm {
   id: string;
   title: string;
   firedAt: number;
+  // True when the page was hidden / user was elsewhere when the alarm
+  // fired. The overlay uses this to switch to a full-screen black variant.
+  firedWhileHidden: boolean;
 }
 
 const STORAGE_KEY = '@pingo/reminders/v1';
@@ -72,7 +75,9 @@ export function ReminderProvider({ children }: { children: React.ReactNode }) {
   // Receive alarm-fire callbacks from the scheduling layer.
   useEffect(() => {
     setAlarmFireHandler(({ id, title }) => {
-      setActiveAlarm({ id, title, firedAt: Date.now() });
+      const hidden =
+        typeof document !== 'undefined' && (document.hidden || document.visibilityState === 'hidden');
+      setActiveAlarm({ id, title, firedAt: Date.now(), firedWhileHidden: !!hidden });
     });
     return () => setAlarmFireHandler(null);
   }, []);
