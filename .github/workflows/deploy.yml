@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - claude/new-app-project-0fxBY
+      - claude/pingo-project-fzQzK
+  workflow_dispatch:
 
 permissions:
   contents: read
