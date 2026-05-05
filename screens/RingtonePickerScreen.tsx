@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Radius } from '../constants/tokens';
 
 type WaveType = 'sine' | 'square' | 'triangle' | 'sawtooth';
@@ -22,18 +23,18 @@ type Ringtone = {
 };
 
 const STANDARD: Ringtone[] = [
-  { id: 'pingo', name: 'Pingo (기본)', freq: 880, type: 'sine', pattern: [0.12, 0.08, 0.12] },
-  { id: 'pulse', name: '펄스', freq: 660, type: 'square', pattern: [0.08, 0.06, 0.08, 0.06, 0.12] },
-  { id: 'soft', name: '소프트 벨', freq: 740, type: 'triangle', pattern: [0.18, 0.14, 0.22] },
-  { id: 'chime', name: '차임', freq: 1046, type: 'sine', pattern: [0.16, 0.12, 0.2] },
-  { id: 'beam', name: '빔', freq: 520, type: 'sawtooth', pattern: [0.1, 0.1, 0.16] },
+  { id: 'pingo', name: 'Pingo', freq: 880, type: 'sine', pattern: [0.12, 0.08, 0.12] },
+  { id: 'pulse', name: 'Pulse', freq: 660, type: 'square', pattern: [0.08, 0.06, 0.08, 0.06, 0.12] },
+  { id: 'soft', name: 'Soft', freq: 740, type: 'triangle', pattern: [0.18, 0.14, 0.22] },
+  { id: 'chime', name: 'Chime', freq: 1046, type: 'sine', pattern: [0.16, 0.12, 0.2] },
+  { id: 'beam', name: 'Beam', freq: 520, type: 'sawtooth', pattern: [0.1, 0.1, 0.16] },
 ];
 
 const CLASSIC: Ringtone[] = [
-  { id: 'classic-bell', name: '클래식 벨', freq: 1320, type: 'sine', pattern: [0.22, 0.18, 0.3] },
-  { id: 'old-phone', name: '구형 전화', freq: 480, type: 'square', pattern: [0.4, 0.2, 0.4] },
-  { id: 'wood', name: '우드 블록', freq: 392, type: 'triangle', pattern: [0.08, 0.08, 0.08, 0.08] },
-  { id: 'analog', name: '아날로그', freq: 587, type: 'sawtooth', pattern: [0.14, 0.1, 0.14, 0.1, 0.18] },
+  { id: 'classic-bell', name: 'Classic Bell', freq: 1320, type: 'sine', pattern: [0.22, 0.18, 0.3] },
+  { id: 'old-phone', name: 'Old Phone', freq: 480, type: 'square', pattern: [0.4, 0.2, 0.4] },
+  { id: 'wood', name: 'Wood Block', freq: 392, type: 'triangle', pattern: [0.08, 0.08, 0.08, 0.08] },
+  { id: 'analog', name: 'Analog', freq: 587, type: 'sawtooth', pattern: [0.14, 0.1, 0.14, 0.1, 0.18] },
 ];
 
 function playTone(rt: Ringtone) {
@@ -51,8 +52,7 @@ function playTone(rt: Ringtone) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = rt.type;
-    // Slight pitch variance per note for melodic feel
-    const detune = i % 2 === 0 ? 0 : 4; // semitones-ish via detune cents
+    const detune = i % 2 === 0 ? 0 : 4;
     osc.frequency.value = rt.freq;
     osc.detune.value = detune * 100;
     gain.gain.setValueAtTime(0, t);
@@ -63,7 +63,6 @@ function playTone(rt: Ringtone) {
     osc.stop(t + dur + 0.02);
     t += dur + gap;
   });
-  // Auto-close context after playback finishes
   const total = (t - now) * 1000 + 50;
   setTimeout(() => {
     ctx.close().catch(() => {});
@@ -74,34 +73,38 @@ function RingtoneRow({
   rt,
   selected,
   onSelect,
+  isLast,
 }: {
   rt: Ringtone;
   selected: boolean;
   onSelect: (id: string) => void;
+  isLast: boolean;
 }) {
   return (
     <TouchableOpacity
-      style={[styles.row, selected && styles.rowSelected]}
-      activeOpacity={0.75}
+      style={[styles.row, !isLast && styles.rowDivider, selected && styles.rowSelected]}
+      activeOpacity={0.7}
       onPress={() => {
         onSelect(rt.id);
         playTone(rt);
       }}
     >
-      <View style={styles.rowLeft}>
-        <View style={[styles.dot, selected && styles.dotSelected]}>
-          {selected ? <View style={styles.dotInner} /> : null}
-        </View>
-        <Text style={styles.rowText}>{rt.name}</Text>
+      <Text style={styles.rowText}>{rt.name}</Text>
+      <View style={styles.rowRight}>
+        <TouchableOpacity
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          onPress={() => playTone(rt)}
+          style={styles.playBtn}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="play" size={11} color={Colors.accent} style={{ marginLeft: 1 }} />
+        </TouchableOpacity>
+        {selected ? (
+          <Ionicons name="checkmark" size={20} color={Colors.accent} />
+        ) : (
+          <View style={{ width: 20 }} />
+        )}
       </View>
-      <TouchableOpacity
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        onPress={() => playTone(rt)}
-        style={styles.playBtn}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.playGlyph}>▶</Text>
-      </TouchableOpacity>
     </TouchableOpacity>
   );
 }
@@ -129,11 +132,11 @@ export function RingtonePickerScreen({
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={styles.headerCancel}>취소</Text>
+              <Text style={styles.headerCancel}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>벨소리</Text>
+            <Text style={styles.headerTitle}>Sound</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={styles.headerDone}>완료</Text>
+              <Text style={styles.headerDone}>Done</Text>
             </TouchableOpacity>
           </View>
 
@@ -144,31 +147,33 @@ export function RingtonePickerScreen({
           >
             <Text style={styles.sectionLabel}>STANDARD</Text>
             <View style={styles.group}>
-              {STANDARD.map((rt) => (
+              {STANDARD.map((rt, i) => (
                 <RingtoneRow
                   key={rt.id}
                   rt={rt}
                   selected={selected === rt.id}
                   onSelect={setSelected}
+                  isLast={i === STANDARD.length - 1}
                 />
               ))}
             </View>
 
             <Text style={[styles.sectionLabel, { marginTop: 22 }]}>CLASSIC</Text>
             <View style={styles.group}>
-              {CLASSIC.map((rt) => (
+              {CLASSIC.map((rt, i) => (
                 <RingtoneRow
                   key={rt.id}
                   rt={rt}
                   selected={selected === rt.id}
                   onSelect={setSelected}
+                  isLast={i === CLASSIC.length - 1}
                 />
               ))}
             </View>
 
             {Platform.OS !== 'web' ? (
               <Text style={styles.platformNote}>
-                ※ 미리듣기는 웹에서 지원됩니다.
+                Preview is supported on web only.
               </Text>
             ) : null}
           </ScrollView>
@@ -185,20 +190,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: Colors.bg,
+    backgroundColor: Colors.bgElev,
     borderTopLeftRadius: Radius.modal,
     borderTopRightRadius: Radius.modal,
     paddingBottom: 16,
     maxHeight: '88%',
-    borderTopWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairlineStrong,
   },
   handle: {
     alignSelf: 'center',
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,247,232,0.20)',
     marginTop: 8,
     marginBottom: 6,
   },
@@ -240,15 +245,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: Colors.textSec,
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
     marginBottom: 8,
     paddingLeft: 4,
   },
   group: {
     backgroundColor: Colors.card,
     borderRadius: Radius.card,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairline,
     overflow: 'hidden',
   },
   row: {
@@ -256,55 +261,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 13,
+  },
+  rowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: Colors.hairline,
   },
   rowSelected: {
-    backgroundColor: 'rgba(108,99,255,0.08)',
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
+    backgroundColor: Colors.accentSoft,
   },
   rowText: {
     fontFamily: Fonts.text,
     fontSize: 15,
     color: Colors.text,
+    flex: 1,
   },
-  dot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.textTer,
+  rowRight: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dotSelected: {
-    borderColor: Colors.accent,
-  },
-  dotInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.accent,
+    gap: 12,
   },
   playBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(108,99,255,0.16)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 12,
-  },
-  playGlyph: {
-    color: Colors.accent,
-    fontSize: 12,
-    marginLeft: 2,
   },
   platformNote: {
     marginTop: 18,

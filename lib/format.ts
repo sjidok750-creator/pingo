@@ -20,10 +20,12 @@ export function ddayInfo(fireAt: Date, now = new Date()): { dday: number; label:
   return { dday: days, label, urgency };
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export function formatNextLine(fireAt: Date, now = new Date()): string {
   const diffMin = Math.max(0, Math.round((fireAt.getTime() - now.getTime()) / 60000));
   if (diffMin < 60 && fireAt.getTime() > now.getTime()) {
-    return `${diffMin}분 후 알림`;
+    return diffMin === 0 ? 'in <1m' : `in ${diffMin}m`;
   }
   const sameDay =
     fireAt.getFullYear() === now.getFullYear() &&
@@ -38,14 +40,14 @@ export function formatNextLine(fireAt: Date, now = new Date()): string {
 
   const h = fireAt.getHours();
   const m = fireAt.getMinutes();
-  const ampm = h < 12 ? '오전' : '오후';
+  const ampm = h < 12 ? 'AM' : 'PM';
   const h12 = h % 12 === 0 ? 12 : h % 12;
   const mm = m.toString().padStart(2, '0');
-  const timePart = m === 0 ? `${ampm} ${h12}시` : `${ampm} ${h12}:${mm}`;
+  const timePart = `${h12}:${mm} ${ampm}`;
 
-  if (sameDay) return `오늘 ${timePart} 알림`;
-  if (isTomorrow) return `내일 ${timePart} 알림`;
-  return `${fireAt.getMonth() + 1}월 ${fireAt.getDate()}일 ${timePart} 알림`;
+  if (sameDay) return `Today at ${timePart}`;
+  if (isTomorrow) return `Tomorrow at ${timePart}`;
+  return `${MONTHS[fireAt.getMonth()]} ${fireAt.getDate()} at ${timePart}`;
 }
 
 let displayIdCounter = 0;

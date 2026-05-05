@@ -32,7 +32,6 @@ function pad(n: number) {
 }
 
 function isoLocal(d: Date): string {
-  // yyyy-MM-ddTHH:mm in local time, suitable for input[type=datetime-local]
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
     d.getMinutes(),
   )}`;
@@ -46,11 +45,11 @@ function fromIsoLocal(s: string): Date {
 }
 
 const QUICK_OFFSETS: { label: string; seconds: number }[] = [
-  { label: '+10초', seconds: 10 },
-  { label: '+1분', seconds: 60 },
-  { label: '+5분', seconds: 5 * 60 },
-  { label: '+1시간', seconds: 60 * 60 },
-  { label: '+1일', seconds: 24 * 60 * 60 },
+  { label: '+10s', seconds: 10 },
+  { label: '+1m', seconds: 60 },
+  { label: '+5m', seconds: 5 * 60 },
+  { label: '+1h', seconds: 60 * 60 },
+  { label: '+1d', seconds: 24 * 60 * 60 },
 ];
 
 export function AddReminderModal({ visible, initial, onClose, onSubmit, onDelete }: Props) {
@@ -82,9 +81,9 @@ export function AddReminderModal({ visible, initial, onClose, onSubmit, onDelete
           <View style={styles.handle} />
           <View style={styles.headerRow}>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={styles.headerCancel}>취소</Text>
+              <Text style={styles.headerCancel}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{isEdit ? '리마인더 수정' : '새 리마인더'}</Text>
+            <Text style={styles.headerTitle}>{isEdit ? 'Edit Reminder' : 'New Reminder'}</Text>
             <TouchableOpacity
               disabled={!canSave}
               onPress={() => {
@@ -93,24 +92,23 @@ export function AddReminderModal({ visible, initial, onClose, onSubmit, onDelete
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Text style={[styles.headerDone, !canSave && styles.headerDoneDisabled]}>저장</Text>
+              <Text style={[styles.headerDone, !canSave && styles.headerDoneDisabled]}>Save</Text>
             </TouchableOpacity>
           </View>
 
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-            <Text style={styles.label}>제목</Text>
+            <Text style={styles.label}>TITLE</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
-              placeholder="예: 비타민 복용"
+              placeholder="e.g. Take vitamins"
               placeholderTextColor={Colors.textTer}
               style={styles.input}
               autoFocus={!isEdit}
             />
 
-            <Text style={styles.label}>알림 시각</Text>
+            <Text style={styles.label}>WHEN</Text>
             {Platform.OS === 'web' ? (
-              // Use native HTML datetime picker on web for reliability
               React.createElement('input', {
                 type: 'datetime-local',
                 value: isoLocal(when),
@@ -139,25 +137,26 @@ export function AddReminderModal({ visible, initial, onClose, onSubmit, onDelete
             </View>
 
             <View style={styles.rowSwitch}>
-              <Text style={styles.label}>매일 반복</Text>
+              <Text style={styles.label}>REPEAT DAILY</Text>
               <Switch
                 value={recurring}
                 onValueChange={setRecurring}
-                trackColor={{ false: '#3A3A55', true: Colors.accent }}
+                trackColor={{ false: '#3A332E', true: Colors.accent }}
                 thumbColor="#fff"
+                ios_backgroundColor="#3A332E"
               />
             </View>
 
             {isEdit && onDelete ? (
               <TouchableOpacity style={styles.deleteBtn} activeOpacity={0.85} onPress={onDelete}>
-                <Text style={styles.deleteBtnText}>삭제</Text>
+                <Text style={styles.deleteBtnText}>Delete</Text>
               </TouchableOpacity>
             ) : null}
 
             <Text style={styles.hint}>
               {Platform.OS === 'web'
-                ? '※ 웹에서는 브라우저 알림 권한이 필요하며, 탭이 닫혀 있으면 알림이 트리거되지 않을 수 있습니다.'
-                : '※ 디바이스 알림 권한이 필요합니다.'}
+                ? 'Browser notification permission is required. Reminders won’t fire if the tab is closed.'
+                : 'Notification permission is required.'}
             </Text>
           </ScrollView>
         </SafeAreaView>
@@ -169,7 +168,7 @@ export function AddReminderModal({ visible, initial, onClose, onSubmit, onDelete
 const webInputStyle = {
   background: Colors.card,
   color: Colors.text,
-  border: '0.5px solid rgba(255,255,255,0.08)',
+  border: '1px solid rgba(255,247,232,0.08)',
   borderRadius: Radius.chip,
   padding: '12px 14px',
   fontSize: 15,
@@ -187,20 +186,20 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: Colors.bg,
+    backgroundColor: Colors.bgElev,
     borderTopLeftRadius: Radius.modal,
     borderTopRightRadius: Radius.modal,
     paddingBottom: 16,
     maxHeight: '92%',
-    borderTopWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairlineStrong,
   },
   handle: {
     alignSelf: 'center',
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,247,232,0.20)',
     marginTop: 8,
     marginBottom: 6,
   },
@@ -234,16 +233,15 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 28,
-    gap: 8,
   },
   label: {
     fontFamily: Fonts.text,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.textSec,
-    letterSpacing: 0.4,
+    letterSpacing: 1.0,
     marginTop: 14,
     marginBottom: 8,
   },
@@ -255,50 +253,51 @@ const styles = StyleSheet.create({
     color: Colors.text,
     fontSize: 15,
     fontFamily: Fonts.text,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairline,
   },
   quickRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 10,
+    marginTop: 12,
   },
   quickChip: {
-    backgroundColor: 'rgba(108,99,255,0.16)',
+    backgroundColor: Colors.accentSoft,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Radius.chip,
+    paddingVertical: 7,
+    borderRadius: Radius.pill,
   },
   quickChipText: {
     color: Colors.accent,
     fontFamily: Fonts.text,
     fontSize: 13,
     fontWeight: '600',
+    letterSpacing: -0.1,
   },
   rowSwitch: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 14,
+    marginTop: 6,
   },
   deleteBtn: {
-    marginTop: 22,
-    backgroundColor: 'rgba(192,57,43,0.18)',
+    marginTop: 24,
+    backgroundColor: 'rgba(224,120,86,0.12)',
     borderRadius: Radius.chip,
-    paddingVertical: 12,
+    paddingVertical: 13,
     alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: 'rgba(192,57,43,0.4)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(224,120,86,0.32)',
   },
   deleteBtnText: {
-    color: '#FF8B7A',
+    color: Colors.red,
     fontWeight: '600',
     fontFamily: Fonts.text,
     fontSize: 15,
   },
   hint: {
-    marginTop: 18,
+    marginTop: 22,
     fontSize: 12,
     color: Colors.textTer,
     fontFamily: Fonts.text,

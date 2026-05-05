@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Fonts, Radius } from '../constants/tokens';
 import { Reminder, ReminderCard } from './ReminderCard';
 
@@ -87,8 +88,8 @@ export function SwipeableReminderCard({
             onEdit();
           }}
         >
-          <Text style={styles.actionGlyph}>✎</Text>
-          <Text style={styles.actionLabel}>수정</Text>
+          <Ionicons name="create-outline" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>Edit</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, styles.deleteBtn]}
@@ -98,8 +99,8 @@ export function SwipeableReminderCard({
             onDelete();
           }}
         >
-          <Text style={styles.actionGlyph}>🗑</Text>
-          <Text style={styles.actionLabel}>삭제</Text>
+          <Ionicons name="trash-outline" size={22} color="#fff" />
+          <Text style={styles.actionLabel}>Delete</Text>
         </TouchableOpacity>
       </View>
 
@@ -132,19 +133,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   editBtn: {
-    backgroundColor: '#3A3A55',
+    backgroundColor: '#5A4A3E',
   },
   deleteBtn: {
-    backgroundColor: '#C0392B',
-  },
-  actionGlyph: {
-    color: '#fff',
-    fontSize: 20,
+    backgroundColor: '#B85F40',
   },
   actionLabel: {
     color: '#fff',
     fontFamily: Fonts.text,
     fontSize: 12,
     fontWeight: '600',
+    marginTop: 2,
   },
 });

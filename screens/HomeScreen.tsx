@@ -7,21 +7,13 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { SwipeableReminderCard } from '../components/SwipeableReminderCard';
 import { RingtonePickerScreen } from './RingtonePickerScreen';
 import { AddReminderModal, AddReminderValue } from './AddReminderModal';
 import { Colors, Fonts, Radius } from '../constants/tokens';
 import { useReminders } from '../lib/reminderStore';
 import { toDisplay } from '../lib/format';
-
-function PlusIcon({ color = '#fff', size = 24 }: { color?: string; size?: number }) {
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: size * 0.9, color, fontWeight: '300', lineHeight: size }}>+</Text>
-    </View>
-  );
-}
 
 function StatCard({
   label,
@@ -39,22 +31,22 @@ function StatCard({
       <Text style={styles.statLabel}>{label}</Text>
       <View style={styles.statValueRow}>
         <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
-        <Text style={styles.statUnit}>{unit}</Text>
+        {unit ? <Text style={styles.statUnit}>{unit}</Text> : null}
       </View>
     </View>
   );
 }
 
 function formatUntil(ms: number): { value: string; unit: string } {
-  if (ms <= 0) return { value: '0', unit: '분' };
+  if (ms <= 0) return { value: '0', unit: 'm' };
   const totalMin = Math.round(ms / 60000);
-  if (totalMin < 60) return { value: String(totalMin), unit: '분' };
+  if (totalMin < 60) return { value: String(totalMin), unit: 'm' };
   const hours = Math.floor(totalMin / 60);
   const min = totalMin % 60;
-  if (hours < 24) return { value: String(hours), unit: min ? `시간 ${min}분` : '시간' };
+  if (hours < 24) return { value: String(hours), unit: min ? `h ${min}m` : 'h' };
   const days = Math.floor(hours / 24);
   const remH = hours % 24;
-  return { value: String(days), unit: remH ? `일 ${remH}시간` : '일' };
+  return { value: String(days), unit: remH ? `d ${remH}h` : 'd' };
 }
 
 export function HomeScreen() {
@@ -97,33 +89,34 @@ export function HomeScreen() {
               <Text style={styles.wordmark}>
                 Pingo<Text style={styles.wordmarkDot}>.</Text>
               </Text>
-              <Text style={styles.subtitle}>잊지 않을게요</Text>
+              <Text style={styles.subtitle}>Stay on track</Text>
             </View>
             <TouchableOpacity
-              style={styles.bellButton}
+              style={styles.iconButton}
               activeOpacity={0.7}
               onPress={() => setRingtoneOpen(true)}
             >
-              <Text style={{ fontSize: 18, color: Colors.text }}>🔔</Text>
+              <Ionicons name="notifications-outline" size={20} color={Colors.text} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.statsRow}>
-            <StatCard label="활성 알림" value={String(reminders.length)} unit="개" />
+            <StatCard label="Active" value={String(reminders.length)} unit="" />
             <StatCard
-              label="다음 알림까지"
-              value={untilNext ? untilNext.value : '-'}
+              label="Next in"
+              value={untilNext ? untilNext.value : '—'}
               unit={untilNext ? untilNext.unit : ''}
               valueColor={Colors.accent}
             />
           </View>
 
-          <Text style={styles.sectionLabel}>예정된 일정</Text>
+          <Text style={styles.sectionLabel}>UPCOMING</Text>
 
           {ready && sorted.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>아직 등록된 알림이 없어요</Text>
-              <Text style={styles.emptyBody}>오른쪽 아래 + 버튼으로 첫 리마인더를 만들어보세요.</Text>
+              <Ionicons name="alarm-outline" size={28} color={Colors.textTer} />
+              <Text style={styles.emptyTitle}>No reminders yet</Text>
+              <Text style={styles.emptyBody}>Tap + to create your first one.</Text>
             </View>
           ) : (
             <View style={styles.cardList}>
@@ -147,15 +140,12 @@ export function HomeScreen() {
       </SafeAreaView>
 
       <View style={styles.fabWrap} pointerEvents="box-none">
-        <TouchableOpacity activeOpacity={0.85} onPress={() => setAddOpen(true)}>
-          <LinearGradient
-            colors={[Colors.accent, '#5048D9']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.fab}
-          >
-            <PlusIcon color="#fff" size={24} />
-          </LinearGradient>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setAddOpen(true)}
+          style={styles.fab}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -206,82 +196,83 @@ const styles = StyleSheet.create({
   },
   ambientGlow: {
     position: 'absolute',
-    top: -100,
-    left: -50,
-    width: 300,
-    height: 300,
-    borderRadius: 150,
-    backgroundColor: 'rgba(108,99,255,0.12)',
+    top: -120,
+    right: -60,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: 'rgba(218,119,86,0.10)',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 120,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 20,
+    paddingHorizontal: 22,
+    paddingTop: 16,
     paddingBottom: 4,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   headerLeft: {
     flex: 1,
   },
   wordmark: {
     fontFamily: Fonts.display,
-    fontSize: 38,
-    fontWeight: '800',
+    fontSize: 34,
+    fontWeight: '700',
     color: Colors.text,
-    letterSpacing: -1.4,
-    lineHeight: 42,
+    letterSpacing: -1.2,
+    lineHeight: 38,
   },
   wordmarkDot: {
     color: Colors.accent,
   },
   subtitle: {
     fontFamily: Fonts.text,
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.textSec,
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
     marginTop: 2,
   },
-  bellButton: {
+  iconButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.card,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: Colors.glassFill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairlineStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
   statsRow: {
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 20,
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 22,
   },
   statCard: {
     flex: 1,
     backgroundColor: Colors.card,
     borderRadius: Radius.chip,
-    padding: 12,
-    paddingLeft: 14,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.05)',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairline,
   },
   statLabel: {
     fontSize: 11,
     color: Colors.textSec,
     marginBottom: 4,
-    letterSpacing: 0.2,
+    letterSpacing: 0.4,
     fontFamily: Fonts.text,
+    fontWeight: '500',
   },
   statValueRow: {
     flexDirection: 'row',
@@ -295,41 +286,42 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   statUnit: {
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textSec,
     fontFamily: Fonts.text,
+    fontWeight: '500',
   },
   sectionLabel: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     paddingBottom: 10,
     paddingTop: 4,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: Colors.textSec,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
+    letterSpacing: 1.2,
     fontFamily: Fonts.text,
   },
   cardList: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     gap: 10,
   },
   empty: {
-    marginHorizontal: 20,
+    marginHorizontal: 18,
     paddingVertical: 36,
     paddingHorizontal: 20,
     alignItems: 'center',
     backgroundColor: Colors.card,
     borderRadius: Radius.card,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.05)',
-    gap: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: Colors.hairline,
+    gap: 8,
   },
   emptyTitle: {
     fontFamily: Fonts.display,
     fontSize: 15,
     fontWeight: '600',
     color: Colors.text,
+    marginTop: 4,
   },
   emptyBody: {
     fontFamily: Fonts.text,
@@ -339,22 +331,21 @@ const styles = StyleSheet.create({
   },
   fabWrap: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    right: 22,
     bottom: 32,
-    alignItems: 'center',
     zIndex: 30,
   },
   fab: {
     width: 56,
     height: 56,
     borderRadius: Radius.fab,
+    backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowColor: Colors.accentDeep,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+    elevation: 8,
   },
 });

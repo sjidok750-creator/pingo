@@ -1,16 +1,20 @@
 export const Colors = {
-  bg: '#0A0A0F',
-  card: '#16161E',
-  cardElev: '#1C1C26',
-  accent: '#6C63FF',
-  accentSoft: 'rgba(108,99,255,0.16)',
-  red: '#FF6B6B',
-  amber: '#F7971E',
-  green: '#43E97B',
-  text: '#F0F0F5',
-  textSec: '#8888AA',
-  textTer: '#5A5A75',
-  hairline: 'rgba(255,255,255,0.06)',
+  bg: '#1B1916',
+  bgElev: '#221F1B',
+  card: '#27231F',
+  cardElev: '#2F2B26',
+  accent: '#DA7756',
+  accentDeep: '#B85F40',
+  accentSoft: 'rgba(218,119,86,0.16)',
+  red: '#E07856',
+  amber: '#E0A052',
+  green: '#7FB58A',
+  text: '#ECE6D8',
+  textSec: '#9C9387',
+  textTer: '#665E54',
+  hairline: 'rgba(255,247,232,0.06)',
+  hairlineStrong: 'rgba(255,247,232,0.12)',
+  glassFill: 'rgba(255,247,232,0.06)',
 } as const;
 
 export const Fonts = {
@@ -19,11 +23,12 @@ export const Fonts = {
 } as const;
 
 export const Radius = {
-  card: 20,
-  chip: 14,
-  modal: 28,
+  card: 18,
+  chip: 12,
+  modal: 24,
   fab: 28,
+  pill: 999,
   sm: 8,
   md: 10,
-  lg: 16,
+  lg: 14,
 } as const;
